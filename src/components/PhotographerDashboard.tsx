@@ -461,26 +461,40 @@ export const PhotographerDashboard: React.FC<PhotographerDashboardProps> = ({
                           >
                             <div className="flex items-center gap-1.5">
                               <Clock className="w-3.5 h-3.5" />
-                              <span>Expires: {formatDisplayDate(album.expiresAt)}</span>
+                              <span>Expires on: {formatDisplayDate(album.expiresAt)}</span>
                             </div>
                             <span className="font-bold">
                               {isExpired ? 'EXPIRED' : `${daysLeft} days left`}
                             </span>
                           </div>
 
-                          {/* 30-Day Expiry Renewal Warning */}
+                          {/* 30-Day Expiry Renewal Warning & Couple Reminder */}
                           {(isExpiringSoon || isExpired) && (
-                            <div className="flex items-center justify-between p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-xs">
-                              <span className="text-[11px] text-neutral-400">
-                                Extend +1 Year ({pointSettings.renewalPointsPerAlbum} Pt):
-                              </span>
-                              <button
-                                onClick={() => onRenewAlbum(album.id)}
-                                className="px-2.5 py-1 rounded bg-lime-400 hover:bg-lime-300 text-black font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                            <div className="space-y-2 p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/40 text-xs">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] text-amber-300 font-medium">
+                                  {isExpired ? 'Album Expired' : `Expiring in ${daysLeft} days`}
+                                </span>
+                                <button
+                                  onClick={() => onRenewAlbum(album.id)}
+                                  className="px-2.5 py-1 rounded bg-lime-400 hover:bg-lime-300 text-black font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  <span>Renew (+1 Yr for {pointSettings.renewalPointsPerAlbum} Pt)</span>
+                                </button>
+                              </div>
+
+                              <a
+                                href={`https://wa.me/${album.clientPhone ? album.clientPhone.replace(/[^0-9]/g, '') : ''}?text=${encodeURIComponent(
+                                  `Namaste ${album.coupleName}! Aapka wedding album ${daysLeft <= 0 ? 'expire ho chuka hai' : `agle ${daysLeft} dino mein expire hone wala hai`}. Kripya renewal ya query ke liye humare studio (${photographer.studioName}) se sampark karein.`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-1 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-neutral-300 hover:text-emerald-300 text-[10px] flex items-center justify-center gap-1 transition-colors"
                               >
-                                <RefreshCw className="w-3 h-3" />
-                                <span>Renew (+1 Yr)</span>
-                              </button>
+                                <MessageCircle className="w-3 h-3 text-emerald-400" />
+                                <span>Send WhatsApp Reminder to Couple</span>
+                              </a>
                             </div>
                           )}
 
@@ -512,8 +526,8 @@ export const PhotographerDashboard: React.FC<PhotographerDashboardProps> = ({
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
-                      <div className="p-4 pt-0 grid grid-cols-3 gap-2">
+                      {/* Action Buttons: Open 3D Book, QR, WhatsApp Share */}
+                      <div className="p-4 pt-0 grid grid-cols-4 gap-2">
                         <button
                           onClick={() => onViewAlbum(album)}
                           className="col-span-2 py-2 rounded-xl bg-lime-400 hover:bg-lime-300 text-black text-xs font-bold transition-colors flex items-center justify-center gap-1 cursor-pointer shadow-[0_0_12px_rgba(163,230,53,0.2)]"
@@ -530,6 +544,19 @@ export const PhotographerDashboard: React.FC<PhotographerDashboardProps> = ({
                           <QrCode className="w-3.5 h-3.5 text-lime-400" />
                           <span>QR</span>
                         </button>
+
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(
+                            `✨ View ${album.coupleName}'s 3D Wedding Album: ${window.location.origin}/#album-${album.shareCode}`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:border-emerald-400 text-emerald-400 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                          title="Share Album Link on WhatsApp"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                          <span>Share</span>
+                        </a>
                       </div>
                     </div>
                   );

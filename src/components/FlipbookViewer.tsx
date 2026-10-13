@@ -106,43 +106,90 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
     setDismissPortraitWarning(true);
   };
 
+  // Dynamic viewport-filling spread dimensions calculator
+  const calculateBookDimensions = () => {
+    const isSmallScreen = window.innerWidth < 640;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const headerFooterAllowance = isFullscreen ? 30 : 110;
+    const availableH = Math.max(340, window.innerHeight - headerFooterAllowance);
+    const availableW = Math.max(320, window.innerWidth - (isSmallScreen ? 12 : 60));
+
+    if (isSmallScreen && isPortrait) {
+      // Single-page portrait mode: fill portrait phone area
+      const targetW = Math.min(availableW * 0.96, 480);
+      const targetH = Math.min(availableH * 0.94, targetW * 1.4);
+      return {
+        width: Math.round(targetW),
+        height: Math.round(targetH),
+        usePortrait: true,
+      };
+    } else {
+      // Landscape / Desktop: Two-page spread
+      // Standard wedding album leaf ratio (width-to-height ~ 0.72 per page; total spread ~ 1.44)
+      const ratio = 0.72;
+      const maxSpreadW = availableW;
+      const idealSinglePageW = maxSpreadW / 2;
+
+      let pageH: number;
+      let pageW: number;
+
+      if (idealSinglePageW / ratio > availableH) {
+        pageH = availableH * 0.95;
+        pageW = pageH * ratio;
+      } else {
+        pageW = idealSinglePageW * 0.95;
+        pageH = pageW / ratio;
+      }
+
+      return {
+        width: Math.round(Math.max(260, pageW)),
+        height: Math.round(Math.max(360, pageH)),
+        usePortrait: false,
+      };
+    }
+  };
+
   // Initialize StPageFlip Library Engine
   useEffect(() => {
     if (!bookContainerRef.current || isExpired || !isUnlocked) return;
 
-    // Small delay to allow DOM nodes to mount
-    const timer = setTimeout(() => {
+    let pageFlipInstanceLocal: PageFlip | null = null;
+
+    const initBook = () => {
       if (!bookContainerRef.current) return;
 
       try {
         if (pageFlipInstance.current) {
-          pageFlipInstance.current.destroy();
+          try {
+            pageFlipInstance.current.destroy();
+          } catch {}
           pageFlipInstance.current = null;
         }
 
-        const isSmallScreen = window.innerWidth < 640;
-        const bookWidth = isSmallScreen ? window.innerWidth * 0.95 : 560;
-        const bookHeight = isSmallScreen ? bookWidth * 1.35 : 740;
+        const dims = calculateBookDimensions();
 
         const pageFlip = new PageFlip(bookContainerRef.current, {
-          width: Math.round(bookWidth),
-          height: Math.round(bookHeight),
+          width: dims.width,
+          height: dims.height,
           size: 'stretch',
-          minWidth: 280,
-          maxWidth: 900,
-          minHeight: 380,
-          maxHeight: 1200,
-          maxShadowOpacity: 0.6,
+          minWidth: 260,
+          maxWidth: 1200,
+          minHeight: 340,
+          maxHeight: 1400,
+          maxShadowOpacity: 0.65,
           showCover: true,
           mobileScrollSupport: false,
-          usePortrait: isSmallScreen,
+          usePortrait: dims.usePortrait,
           autoSize: true,
+          drawShadow: true,
+          flippingTime: 700,
         });
 
         const pageElements = bookContainerRef.current.querySelectorAll('.st-page');
         if (pageElements.length > 0) {
           pageFlip.loadFromHTML(pageElements as any);
           pageFlipInstance.current = pageFlip;
+          pageFlipInstanceLocal = pageFlip;
 
           setTotalPages(pageFlip.getPageCount());
 
@@ -156,7 +203,9 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
       } catch (err) {
         console.error('Error initializing PageFlip:', err);
       }
-    }, 100);
+    };
+
+    const timer = setTimeout(initBook, 80);
 
     return () => {
       clearTimeout(timer);
@@ -167,7 +216,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
         pageFlipInstance.current = null;
       }
     };
-  }, [isUnlocked, isExpired, album.pages.length]);
+  }, [isUnlocked, isExpired, album.pages.length, isFullscreen]);
 
   // Keyboard Navigation
   useEffect(() => {
@@ -294,8 +343,8 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
           <div className="space-y-2">
             <h2 className="text-2xl font-bold text-white">Album Expired</h2>
             <p className="text-sm text-lime-400 font-semibold">{album.coupleName}</p>
-            <p className="text-xs text-neutral-400 leading-relaxed max-w-md mx-auto">
-              Ye wedding album expire ho gaya hai. Album dobara activate karwane ke liye kripya apne photographer se sampark karein.
+            <p className="text-sm text-neutral-300 leading-relaxed max-w-md mx-auto">
+              Ye album expire ho gaya hai. Studio se sampark karein.
             </p>
           </div>
 
@@ -310,17 +359,27 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
               <span className="font-mono text-amber-400">{formatDisplayDate(album.expiresAt)}</span>
             </div>
 
-            <a
-              href={`https://wa.me/${album.photographerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                `Namaste! I would like to request reactivation for our wedding album: ${album.coupleName}.`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-3 rounded-full bg-lime-400 hover:bg-lime-300 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(163,230,53,0.3)]"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Contact Studio on WhatsApp to Reactivate</span>
-            </a>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => onOpenInquiry(album)}
+                className="w-full py-3 rounded-full bg-lime-400 hover:bg-lime-300 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(163,230,53,0.3)]"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Book Studio</span>
+              </button>
+
+              <a
+                href={`https://wa.me/${album.photographerPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                  `Namaste! I would like to request reactivation for our wedding album: ${album.coupleName}.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer border border-neutral-700"
+              >
+                <MessageCircle className="w-4 h-4 text-lime-400" />
+                <span>WhatsApp Studio</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -576,8 +635,10 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
 
         {/* Real StPageFlip Container */}
         <div
+          onDoubleClick={() => setZoomLevel((prev) => (prev === 1 ? 1.4 : 1))}
           style={{ transform: `scale(${zoomLevel})`, transition: 'transform 0.3s ease' }}
           className="relative max-w-full flex items-center justify-center"
+          title="Double-click to zoom"
         >
           <div ref={bookContainerRef} id="flipbook-canvas" className="shadow-2xl">
             {/* FRONT HARD COVER */}
@@ -585,7 +646,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
               <img
                 src={album.coverImage}
                 alt={album.coupleName}
-                className="w-full h-full object-cover pointer-events-none"
+                className="w-full h-full object-cover pointer-events-none select-none"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-8 text-left">
                 <span className="text-xs uppercase font-bold text-lime-400 tracking-wider mb-1">
@@ -613,7 +674,7 @@ export const FlipbookViewer: React.FC<FlipbookViewerProps> = ({
                   src={page.imageUrl}
                   alt={page.title || `Page ${index + 1}`}
                   className="w-full h-full object-cover pointer-events-none select-none"
-                  loading={index < 4 ? 'eager' : 'lazy'}
+                  loading={Math.abs(index - currentPage) <= 2 ? 'eager' : 'lazy'}
                 />
 
                 {/* Studio Watermark Overlay if enabled */}
